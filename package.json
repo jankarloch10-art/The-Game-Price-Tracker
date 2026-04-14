@@ -1,0 +1,6 @@
+{
+  "name": "game-price-tracker",
+  "version": "1.0.0",
+  "description": "Steam & Epic Games price tracker",
+  "engines": { "node": ">=18" }
+}
