@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GameDrop — Game Price Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #161920;
+      --surface2: #1e2230;
+      --border: #2a2f3d;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --steam: #4fc3f7;
+      --epic: #a78bfa;
+      --deal: #34d399;
+      --low: #fbbf24;
+      --danger: #f87171;
+      --accent: #38bdf8;
+      --font-mono: 'Space Mono', monospace;
+      --font-body: 'DM Sans', sans-serif;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; }
+
+    /* header */
+    header { border-bottom: 1px solid var(--border); padding: 1.25rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+    .logo span { color: var(--muted); }
+    .tagline { font-size: 12px; color: var(--muted); }
+
+    /* main */
+    main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    /* search */
+    .search-wrap { display: flex; gap: 10px; margin-bottom: 2rem; }
+    .search-wrap input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.75rem 1rem; color: var(--text);
+      font-family: var(--font-body); font-size: 15px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-wrap input::placeholder { color: var(--muted); }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap button {
+      background: var(--accent); color: #0d0f14; border: none;
+      border-radius: var(--radius); padding: 0.75rem 1.4rem;
+      font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+      cursor: pointer; white-space: nowrap; transition: opacity 0.15s;
+    }
+    .search-wrap button:hover { opacity: 0.85; }
+    .search-wrap button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* search results dropdown */
+    #searchResults { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1.5rem; overflow: hidden; display: none; }
+    .result-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; gap: 12px; }
+    .result-item:last-child { border-bottom: none; }
+    .result-item:hover { background: var(--surface2); }
+    .result-name { font-size: 14px; font-weight: 500; }
+    .result-stores { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .add-btn { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-family: var(--font-body); white-space: nowrap; transition: border-color 0.15s, color 0.15s; }
+    .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-btn.added { color: var(--muted); cursor: default; border-color: transparent; }
+
+    /* tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 1.5rem; }
+    .tab { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; font-family: var(--font-body); transition: all 0.15s; }
+    .tab:hover { color: var(--text); border-color: var(--muted); }
+    .tab.active { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+
+    /* game cards */
+    .game-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem; margin-bottom: 10px; transition: border-color 0.15s; }
+    .game-card:hover { border-color: #3a3f52; }
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+    .game-name { font-size: 15px; font-weight: 600; }
+    .game-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 2px; transition: color 0.15s; }
+    .remove-btn:hover { color: var(--danger); }
+
+    /* price grid */
+    .prices { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .price-box { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+    .price-store { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
+    .price-store.steam { color: var(--steam); }
+    .price-store.epic { color: var(--epic); }
+    .price-store.low { color: var(--low); }
+    .dot { width: 5px; height: 5px; border-radius: 50%; }
+    .dot-steam { background: var(--steam); }
+    .dot-epic { background: var(--epic); }
+    .dot-low { background: var(--low); }
+    .price-current { font-family: var(--font-mono); font-size: 16px; font-weight: 700; }
+    .price-current.free { color: var(--deal); }
+    .price-current.sale { color: var(--deal); }
+    .price-current.normal { color: var(--text); }
+    .price-current.na { color: var(--muted); font-size: 12px; font-family: var(--font-body); font-weight: 400; }
+    .price-original { font-size: 11px; color: var(--muted); text-decoration: line-through; margin-top: 1px; font-family: var(--font-mono); }
+    .discount-badge { display: inline-block; background: #064e3b; color: var(--deal); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-family: var(--font-mono); }
+
+    /* empty / loading */
+    .empty { text-align: center; padding: 4rem 1rem; color: var(--muted); }
+    .empty-icon { font-size: 36px; margin-bottom: 10px; }
+    .empty p { font-size: 14px; }
+    .loading-msg { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 13px; font-family: var(--font-mono); }
+    .error-msg { background: #2d1515; border: 1px solid #5c2626; border-radius: var(--radius); padding: 10px 14px; color: var(--danger); font-size: 13px; margin-bottom: 1rem; display: none; }
+
+    /* toast */
+    #toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 999; white-space: nowrap; }
+    #toast.show { opacity: 1; }
+
+    @media (max-width: 520px) {
+      .prices { grid-template-columns: 1fr 1fr; }
+      header { padding: 1rem; }
+      main { padding: 1.25rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">game<span>//</span>drop</div>
+  <div class="tagline">Steam &amp; Epic price tracker</div>
+</header>
+
+<main>
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Search any game (e.g. Cyberpunk, Elden Ring…)" />
+    <button id="searchBtn" onclick="doSearch()">Search</button>
+  </div>
+  <div id="errorMsg" class="error-msg"></div>
+  <div id="searchResults"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('all',this)">All games</button>
+    <button class="tab" onclick="switchTab('deals',this)">On sale</button>
+    <button class="tab" onclick="switchTab('free',this)">Free</button>
+  </div>
+
+  <div id="gameList"></div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────
+  let trackedGames = JSON.parse(localStorage.getItem('trackedGames') || '[]');
+  let priceCache = JSON.parse(localStorage.getItem('priceCache') || '{}');
+  let cacheTime  = JSON.parse(localStorage.getItem('cacheTime')  || '{}');
+  let currentTab = 'all';
+  const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+  // ─── Helpers ─────────────────────────────────────────────
+  function save() {
+    localStorage.setItem('trackedGames', JSON.stringify(trackedGames));
+    localStorage.setItem('priceCache',   JSON.stringify(priceCache));
+    localStorage.setItem('cacheTime',    JSON.stringify(cacheTime));
+  }
+
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
+  }
+
+  function fmt(p) {
+    if (p === null || p === undefined) return null;
+    if (p === 0) return 'Free';
+    return '$' + Number(p).toFixed(2);
+  }
+
+  // ─── API calls ───────────────────────────────────────────
+  async function searchGames(query) {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error('Search failed');
+    return res.json();
+  }
+
+  async function getPrices(gameId, plain) {
+    const now = Date.now();
+    if (priceCache[gameId] && (now - (cacheTime[gameId]||0)) < CACHE_TTL) {
+      return priceCache[gameId];
+    }
+    const res = await fetch(`/api/prices?plain=${encodeURIComponent(plain)}`);
+    if (!res.ok) throw new Error('Price fetch failed');
+    const data = await res.json();
+    priceCache[gameId] = data;
+    cacheTime[gameId] = now;
+    save();
+    return data;
+  }
+
+  // ─── Search ──────────────────────────────────────────────
+  async function doSearch() {
+    const q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+    const btn = document.getElementById('searchBtn');
+    btn.disabled = true;
+    btn.textContent = '...';
+    showError('');
+    const el = document.getElementById('searchResults');
+    el.style.display = 'block';
+    el.innerHTML = '<div class="loading-msg">searching...</div>';
+    try {
+      const results = await searchGames(q);
+      if (!results.length) {
+        el.innerHTML = '<div class="loading-msg">no games found</div>';
+      } else {
+        el.innerHTML = results.map(g => {
+          const already = trackedGames.find(t => t.id === g.id);
+          return `<div class="result-item">
+            <div>
+              <div class="result-name">${escHtml(g.title)}</div>
+              <div class="result-stores">${g.stores || ''}</div>
+            </div>
+            ${already
+              ? `<span class="add-btn added">Tracking</span>`
+              : `<button class="add-btn" onclick="addGame('${g.id}','${escHtml(g.plain)}','${escHtml(g.title)}')">+ Track</button>`}
+          </div>`;
+        }).join('');
+      }
+    } catch(e) {
+      showError('Could not reach the API. Make sure the server is running.');
+      el.style.display = 'none';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // ─── Add / Remove ────────────────────────────────────────
+  async function addGame(id, plain, title) {
+    if (trackedGames.find(g => g.id === id)) return;
+    trackedGames.push({ id, plain, title });
+    save();
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('searchInput').value = '';
+    showError('');
+    toast(`Added "${title}"`);
+    renderList();
+    // Fetch prices right away
+    try { await getPrices(id, plain); renderList(); } catch(e) {}
+  }
+
+  function removeGame(id) {
+    trackedGames = trackedGames.filter(g => g.id !== id);
+    save();
+    renderList();
+  }
+
+  // ─── Render ──────────────────────────────────────────────
+  function getFiltered() {
+    if (currentTab === 'deals') return trackedGames.filter(g => {
+      const p = priceCache[g.id];
+      return p && (p.steamDeal || p.epicDeal);
+    });
+    if (currentTab === 'free') return trackedGames.filter(g => {
+      const p = priceCache[g.id];
+      return p && (p.steamPrice === 0 || p.epicPrice === 0);
+    });
+    return trackedGames;
+  }
+
+  function priceBoxHtml(label, dotClass, storeClass, price, original, deal, discount, low) {
+    let priceClass = 'normal', priceText = fmt(price) || '—';
+    if (price === null || price === undefined) { priceClass = 'na'; priceText = 'Not available'; }
+    else if (price === 0) priceClass = 'free';
+    else if (deal) priceClass = 'sale';
+
+    const origHtml = (deal && original && original !== price)
+      ? `<div class="price-original">${fmt(original)}</div>` : '';
+    const badgeHtml = (deal && discount > 0)
+      ? `<span class="discount-badge">-${discount}%</span>` : '';
+    const lowHtml = low !== null && low !== undefined
+      ? `<div class="price-current" style="color:var(--low);font-size:14px;">${fmt(low)}</div>` : `<div class="price-current na">Unknown</div>`;
+
+    if (label === 'All-time low') {
+      return `<div class="price-box">
+        <div class="price-store low"><span class="dot dot-low"></span>${label}</div>
+        ${lowHtml}
+      </div>`;
+    }
+
+    return `<div class="price-box">
+      <div class="price-store ${storeClass}"><span class="dot ${dotClass}"></span>${label}</div>
+      <div class="price-current ${priceClass}">${priceText}${badgeHtml}</div>
+      ${origHtml}
+    </div>`;
+  }
+
+  function renderCard(game) {
+    const p = priceCache[game.id];
+    const loading = !p;
+    const allLows = [p?.steamLowest, p?.epicLowest].filter(x => x !== null && x !== undefined);
+    const lowest = allLows.length ? Math.min(...allLows) : null;
+
+    return `<div class="game-card" id="card-${game.id}">
+      <div class="card-header">
+        <div>
+          <div class="game-name">${escHtml(game.title)}</div>
+          ${loading ? '<div class="game-meta" style="color:var(--muted);font-size:11px;">loading prices…</div>' : ''}
+        </div>
+        <button class="remove-btn" onclick="removeGame('${game.id}')" title="Remove">✕</button>
+      </div>
+      ${loading ? '<div class="loading-msg" style="padding:0.5rem 0;text-align:left;font-size:12px;">fetching prices…</div>' :
+        `<div class="prices">
+          ${priceBoxHtml('Steam','dot-steam','steam', p.steamPrice, p.steamOriginal, p.steamDeal, p.steamDiscount, null)}
+          ${priceBoxHtml('Epic','dot-epic','epic', p.epicPrice, p.epicOriginal, p.epicDeal, p.epicDiscount, null)}
+          ${priceBoxHtml('All-time low','dot-low','low', null, null, false, 0, lowest)}
+        </div>`}
+    </div>`;
+  }
+
+  async function renderList() {
+    const list = document.getElementById('gameList');
+    const games = getFiltered();
+    if (!trackedGames.length) {
+      list.innerHTML = `<div class="empty"><div class="empty-icon">🎮</div><p>Search for a game above to start tracking prices.</p></div>`;
+      return;
+    }
+    if (!games.length) {
+      list.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><p>No games match this filter.</p></div>`;
+      return;
+    }
+    list.innerHTML = games.map(renderCard).join('');
+
+    // Load any missing prices
+    for (const game of games) {
+      if (!priceCache[game.id]) {
+        try {
+          await getPrices(game.id, game.plain);
+          document.getElementById(`card-${game.id}`)?.outerHTML && renderList();
+        } catch(e) {}
+      }
+    }
+  }
+
+  function switchTab(tab, el) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderList();
+  }
+
+  document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  renderList();
+</script>
+</body>
+</html>
