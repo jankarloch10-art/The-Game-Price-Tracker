@@ -1,4 +1,4 @@
-// api/prices.js — fetches current & historical prices from ITAD
+// api/prices.js — fetches current & historical prices from ITAD using game uuid
 export default async function handler(req, res) {
   const { plain } = req.query;
   if (!plain) return res.status(400).json({ error: 'Missing plain' });
@@ -7,19 +7,10 @@ export default async function handler(req, res) {
   if (!key) return res.status(500).json({ error: 'API key not configured' });
 
   try {
-    // Step 1: look up the game ID from the slug
-    const lookupRes = await fetch(`https://api.isthereanydeal.com/games/lookup/v1?key=${key}&slug=${encodeURIComponent(plain)}`);
-    const lookupData = await lookupRes.json();
-    const gameId = lookupData?.game?.id;
+    // plain is now the ITAD uuid directly — no lookup needed
+    const gameId = plain;
 
-    if (!gameId) {
-      return res.status(200).json({
-        steamPrice: null, steamOriginal: null, steamDeal: false, steamDiscount: 0, steamLowest: null,
-        epicPrice: null, epicOriginal: null, epicDeal: false, epicDiscount: 0, epicLowest: null,
-      });
-    }
-
-    // Step 2: current prices
+    // Current prices
     const pricesRes = await fetch(`https://api.isthereanydeal.com/games/prices/v2?key=${key}&country=US`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -27,7 +18,7 @@ export default async function handler(req, res) {
     });
     const pricesData = await pricesRes.json();
 
-    // Step 3: historical low
+    // Historical low
     const histRes = await fetch(`https://api.isthereanydeal.com/games/historylow/v1?key=${key}&country=US`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -37,9 +28,10 @@ export default async function handler(req, res) {
 
     // Parse current prices
     const deals = pricesData?.[0]?.deals || [];
+    const histShops = histData?.[0]?.shops || [];
 
     const steamDeal = deals.find(d => d.shop?.id?.toLowerCase().includes('steam'));
-    const epicDeal  = deals.find(d => d.shop?.id?.toLowerCase().includes('epic') || d.shop?.id?.toLowerCase().includes('epicgames'));
+    const epicDeal  = deals.find(d => d.shop?.id?.toLowerCase().includes('epic'));
 
     function parseDeal(d) {
       if (!d) return { price: null, original: null, deal: false, discount: 0 };
@@ -52,8 +44,6 @@ export default async function handler(req, res) {
     const s = parseDeal(steamDeal);
     const e = parseDeal(epicDeal);
 
-    // Parse historical lows
-    const histShops = histData?.[0]?.shops || [];
     const steamHist = histShops.find(sh => sh.id?.toLowerCase().includes('steam'));
     const epicHist  = histShops.find(sh => sh.id?.toLowerCase().includes('epic'));
 
