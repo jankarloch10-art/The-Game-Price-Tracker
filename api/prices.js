@@ -7,39 +7,39 @@ export default async function handler(req, res) {
   if (!key) return res.status(500).json({ error: 'API key not configured' });
 
   try {
-    // Current prices
-    const pricesUrl = `https://api.isthereanydeal.com/games/prices/v2?key=${key}&country=US`;
-    const pricesRes = await fetch(pricesUrl, {
+    // Step 1: look up the game ID from the slug
+    const lookupRes = await fetch(`https://api.isthereanydeal.com/games/lookup/v1?key=${key}&slug=${encodeURIComponent(plain)}`);
+    const lookupData = await lookupRes.json();
+    const gameId = lookupData?.game?.id;
+
+    if (!gameId) {
+      return res.status(200).json({
+        steamPrice: null, steamOriginal: null, steamDeal: false, steamDiscount: 0, steamLowest: null,
+        epicPrice: null, epicOriginal: null, epicDeal: false, epicDiscount: 0, epicLowest: null,
+      });
+    }
+
+    // Step 2: current prices
+    const pricesRes = await fetch(`https://api.isthereanydeal.com/games/prices/v2?key=${key}&country=US`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([plain])
+      body: JSON.stringify([gameId])
     });
-    if (!pricesRes.ok) throw new Error(`ITAD prices error: ${pricesRes.status}`);
     const pricesData = await pricesRes.json();
 
-    // Historical low
-    const histUrl = `https://api.isthereanydeal.com/games/historylow/v1?key=${key}&country=US`;
-    const histRes = await fetch(histUrl, {
+    // Step 3: historical low
+    const histRes = await fetch(`https://api.isthereanydeal.com/games/historylow/v1?key=${key}&country=US`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([plain])
+      body: JSON.stringify([gameId])
     });
-    if (!histRes.ok) throw new Error(`ITAD history error: ${histRes.status}`);
     const histData = await histRes.json();
 
     // Parse current prices
-    const gameData = pricesData?.[0];
-    const deals = gameData?.deals || [];
+    const deals = pricesData?.[0]?.deals || [];
 
-    const STEAM = 'steam';
-    const EPIC  = 'epic';
-
-    function findStore(slug) {
-      return deals.find(d => d.shop?.id?.toLowerCase().includes(slug));
-    }
-
-    const steamDeal = findStore(STEAM);
-    const epicDeal  = findStore(EPIC);
+    const steamDeal = deals.find(d => d.shop?.id?.toLowerCase().includes('steam'));
+    const epicDeal  = deals.find(d => d.shop?.id?.toLowerCase().includes('epic') || d.shop?.id?.toLowerCase().includes('epicgames'));
 
     function parseDeal(d) {
       if (!d) return { price: null, original: null, deal: false, discount: 0 };
@@ -53,11 +53,11 @@ export default async function handler(req, res) {
     const e = parseDeal(epicDeal);
 
     // Parse historical lows
-    const hist = histData?.[0];
-    const steamHist = hist?.shops?.find(sh => sh.id?.toLowerCase().includes(STEAM));
-    const epicHist  = hist?.shops?.find(sh => sh.id?.toLowerCase().includes(EPIC));
+    const histShops = histData?.[0]?.shops || [];
+    const steamHist = histShops.find(sh => sh.id?.toLowerCase().includes('steam'));
+    const epicHist  = histShops.find(sh => sh.id?.toLowerCase().includes('epic'));
 
-    res.setHeader('Cache-Control', 's-maxage=1800'); // cache 30 min on CDN
+    res.setHeader('Cache-Control', 's-maxage=1800');
     return res.status(200).json({
       steamPrice:    s.price,
       steamOriginal: s.original,
@@ -71,6 +71,7 @@ export default async function handler(req, res) {
       epicDiscount:  e.discount,
       epicLowest:    epicHist?.low?.amount ?? null,
     });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: err.message });
